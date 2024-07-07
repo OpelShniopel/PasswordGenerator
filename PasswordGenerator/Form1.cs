@@ -16,15 +16,14 @@ public partial class Form1 : Form
     public Form1()
     {
         InitializeComponent();
-
         GeneratePassword();
     }
 
     private void GeneratePassword()
     {
         StringBuilder passwordBuilder = new();
-
         string characterPool = BuildCharacterPool();
+
         AddRequiredCharacters(passwordBuilder);
         FillPassword(passwordBuilder, characterPool);
 
@@ -38,7 +37,7 @@ public partial class Form1 : Form
 
     private char GetRandomCharacter(string characters)
     {
-        if (characters.Length == 0)
+        if (string.IsNullOrEmpty(characters))
             throw new ArgumentException(@"Characters should not be empty", nameof(characters));
 
         // Calculate the maximum value that is evenly divisible by the character pool length
@@ -176,11 +175,9 @@ public partial class Form1 : Form
         // First pass: Add unique characters to newPassword and update characterPool
         foreach (char c in passwordBuilder.ToString())
         {
-            if (uniqueCharacters.Add(c))
-            {
-                newPassword.Append(c);
-                characterPool.Remove(c);
-            }
+            if (!uniqueCharacters.Add(c)) continue;
+            newPassword.Append(c);
+            characterPool.Remove(c);
         }
 
         // Second pass: Fill the password back to the required length with random characters
