@@ -35,41 +35,32 @@ public partial class Form1 : Form
         textBoxGeneratedPassword.Text = passwordBuilder.ToString();
     }
 
+    private int GetSecureRandomNumber(int maxExclusive)
+    {
+        if (maxExclusive <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxExclusive), @"maxExclusive must be positive.");
+
+        int largestMultiple = int.MaxValue - (int.MaxValue % maxExclusive);
+
+        byte[] randomBytes = new byte[4];
+        int randomInt;
+
+        do
+        {
+            _randomGenerator.GetBytes(randomBytes);
+            randomInt = BitConverter.ToInt32(randomBytes, 0) & int.MaxValue;
+        } while (randomInt >= largestMultiple);
+
+        return randomInt % maxExclusive;
+    }
+
     private char GetRandomCharacter(string characters)
     {
         if (string.IsNullOrEmpty(characters))
             throw new ArgumentException(@"Characters should not be empty", nameof(characters));
 
-        // Calculate the maximum value that is evenly divisible by the character pool length
-        int maxVal = (int.MaxValue / characters.Length) * characters.Length;
-        byte[] randomNumber = new byte[4];
-        int randomValue;
-
-        do
-        {
-            _randomGenerator.GetBytes(randomNumber);
-            randomValue = BitConverter.ToInt32(randomNumber, 0) & int.MaxValue; // Ensure non-negative
-        } while (randomValue >= maxVal); // Reject values that would introduce bias
-
-        return characters[randomValue % characters.Length];
-    }
-
-    private int GetRandomNumber(int maxExclusive)
-    {
-        if (maxExclusive <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maxExclusive), @"maxExclusive must be positive.");
-
-        int maxVal = (int.MaxValue / maxExclusive) * maxExclusive;
-        byte[] randomNumber = new byte[4];
-        int value;
-
-        do
-        {
-            _randomGenerator.GetBytes(randomNumber);
-            value = BitConverter.ToInt32(randomNumber, 0) & int.MaxValue; // Ensure non-negative
-        } while (value >= maxVal); // Reject values that would introduce bias
-
-        return value % maxExclusive;
+        int index = GetSecureRandomNumber(characters.Length);
+        return characters[index];
     }
 
     private static string RemoveAmbiguousCharacters(string characterPool)
@@ -85,7 +76,7 @@ public partial class Form1 : Form
 
         return newCharacterPool.ToString();
     }
-    
+
     private void AppendCharacters(CheckBox checkBox, string characters, StringBuilder builder, int numCharacters = 1)
     {
         if (!checkBox.Checked)
@@ -98,7 +89,7 @@ public partial class Form1 : Form
         for (int i = 0; i < numCharacters; i++)
             builder.Append(GetRandomCharacter(characterSet));
     }
-    
+
     private void AddRequiredCharacters(StringBuilder passwordBuilder)
     {
         AppendCharacters(checkBoxLowerCase, LowercaseChars, passwordBuilder);
@@ -107,12 +98,13 @@ public partial class Form1 : Form
         AppendCharacters(checkBoxSpecialChar, SpecialChars, passwordBuilder, (int)numericUpDownMinSpecial.Value);
         AppendCharacters(checkBoxAllowOtherSymbols, OtherSpecialChars, passwordBuilder);
     }
-    
+
     private string BuildCharacterPool()
     {
-        StringBuilder characterPoolBuilder = new();
+        StringBuilder characterPoolBuilder = new StringBuilder(LowercaseChars.Length + UppercaseChars.Length +
+                                                               NumberChars.Length + SpecialChars.Length +
+                                                               OtherSpecialChars.Length);
 
-        // Append characters based on checkbox selections
         if (checkBoxUpperCase.Checked)
             characterPoolBuilder.Append(UppercaseChars);
         if (checkBoxLowerCase.Checked)
@@ -124,7 +116,6 @@ public partial class Form1 : Form
         if (checkBoxAllowOtherSymbols.Checked)
             characterPoolBuilder.Append(OtherSpecialChars);
 
-        // Default to lowercase if no option is selected
         if (characterPoolBuilder.Length == 0)
         {
             checkBoxLowerCase.Checked = true;
@@ -133,13 +124,9 @@ public partial class Form1 : Form
 
         string characterPool = characterPoolBuilder.ToString();
 
-        // Remove ambiguous characters if the option is selected
-        if (checkBoxAvoidAmbiguousCharacters.Checked)
-            characterPool = RemoveAmbiguousCharacters(characterPool);
-
-        return characterPool;
+        return checkBoxAvoidAmbiguousCharacters.Checked ? RemoveAmbiguousCharacters(characterPool) : characterPool;
     }
-    
+
     private void FillPassword(StringBuilder passwordBuilder, string characterPool)
     {
         for (int i = passwordBuilder.Length; i < trackBarPasswordLength.Value; i++)
@@ -158,14 +145,14 @@ public partial class Form1 : Form
         while (n > 1)
         {
             n--;
-            int k = GetRandomNumber(n + 1);
+            int k = GetSecureRandomNumber(n + 1);
             (passwordArray[k], passwordArray[n]) = (passwordArray[n], passwordArray[k]);
         }
 
         passwordBuilder.Clear();
         passwordBuilder.Append(passwordArray);
     }
-    
+
     private void ExcludeDuplicateCharacters(StringBuilder passwordBuilder)
     {
         HashSet<char> uniqueCharacters = new();
@@ -185,7 +172,7 @@ public partial class Form1 : Form
 
         while (newPassword.Length < trackBarPasswordLength.Value && remainingCharacterPool.Count > 0)
         {
-            int index = GetRandomNumber(remainingCharacterPool.Count);
+            int index = GetSecureRandomNumber(remainingCharacterPool.Count);
             newPassword.Append(remainingCharacterPool[index]);
             remainingCharacterPool.RemoveAt(index);
         }
@@ -199,9 +186,7 @@ public partial class Form1 : Form
     {
         int totalMinimumRequiredChars = (int)(numericUpDownMinNumbers.Value + numericUpDownMinSpecial.Value);
 
-        if (trackBarPasswordLength.Value >= totalMinimumRequiredChars)
-            return;
-
+        if (trackBarPasswordLength.Value >= totalMinimumRequiredChars) return;
         trackBarPasswordLength.Value = totalMinimumRequiredChars;
         numericUpDownPasswordLength.Value = totalMinimumRequiredChars;
     }
